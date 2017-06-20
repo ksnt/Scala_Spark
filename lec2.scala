@@ -108,5 +108,28 @@ val numUniqueVisits = visits.keys.distinct().count()
 
 //4.Joins 
 
+// There are two kinds od joins:
+//  1.Inner join (join)
+//  2.Outer join(leftOuterJoin/rightOuterJoin)
+
+// Example
+val as = List((101,("Ruetli",AG)), (102,("Brelaz",DemiTarif)), (103,("Gress",DemiTarifVisa)),(104,("Schatten",DemiTarif)))
+val abos = sc.parallelize(as)
+
+val ls = List((101,"Bern"), (101,"Thun"), (102,"Lausanne"),(102,"Geneve"),(102,"Nyon"),(103,"Zurich"),(103,"St-Gallen"),(103,"Chur"))
+vals localtions = sc.parallelize(ls)
+
+
+// Inner Joins (join)
+// def join[W](other: RDD[(K,W)]): RDD[(K,(V,W))]
+
+val trackedCustomers = abos.join(locations)
+trackedCustomers.collect().foreach(println)
+
+// Outer joins
+
+val abosWithOptionalLocations = abos.leftOuterJoin(locations)
+
+val customersWithLocationDataAndOptionalAbos = abos.rightOuterJoin(locations)
 
 
