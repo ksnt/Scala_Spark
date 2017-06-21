@@ -13,7 +13,7 @@ case class Demographic(id: Int,
 	                   gender: String,
 	                   isEthnicMinority: Boolean,
 	                   servedInMilitary: Boolean)
-val demographics = sc.textfile(...) // Pair RDD (id,demographic)
+val demographics = sc.textFile(...) // Pair RDD (id,demographic)
 
 case class Finances(id: Int,
 	                hasDept: Boolean,
@@ -21,7 +21,7 @@ case class Finances(id: Int,
 	                hasStudentLoans: Boolean,
 	                income: Int)
 
-val finances = sc.textfile(...) // Pair RDD, (id,finances)
+val finances = sc.textFile(...) // Pair RDD, (id,finances)
 
 
 // An example: Selecting Scholarship Recipients
@@ -298,15 +298,266 @@ rankedDF.show()
 */
 
 // 4.DataFrames(2)
+// Cleaning Data with DataFrames
+// drop: rows/records with unwanted values like null or "NaN"
+// replace: certain values with a constant
+// fill: fill null or NaN into something
+
+// Common Actions on DataFrames
+// -collect(): Array[Row]
+// Returns an array that contains all of Rows in this DataFrame
+// -count(): Long
+// Returns the number os rows in the DataFrame
+// -first(): Row/head(): Row
+// Returns the first row in the DataFrame
+// -show(): Unit
+// Display the top 20 rows of DataFrame in a tabular form
+// -take(n:Int): Array[Row]
+// Returns the first n rows in the DataFrame
 
 
+// Joins on DataFrames
+// joins on DataFrames are similar to those on Pair RDDs
+// Several types of joints are available:
+// inner, outer, left_outer, right_outer, leftsemi
 
+// Example
+case class Abo(id:Int,v:(String,String))
+case class Loc(id:Int,v:String)
 
+val as = List(Abo(101,("Ruetli","AG")),Abo(102,("Brelaz","DemiTarif")),Abo(103,("Gress","DemiTarifVisa")),Abo(104,("Shatten","DemiTarif")))
+val abosDF = sc.parallelize(as).toDF
 
+val ls = List(Loc(101,"Bern"),Loc(101,"Thun"),Loc(102,"Lausanne"),Loc(102,"Geneve"),Loc(102,"Nyon"),Loc(103,"Zurich"),Loc(103,"St-Gallen"),Loc(103,"Chur"))
+val locationsDF = sc.parallelize(ls).toDF
+
+// How do we combine only customers that have a subscription and where there is location info?
+val trackedCustomerDF = abosDF.join(locationsDF,abosDF("id") === locationsDF("id"))
+trackedCustomerDF.show()
+/*
++---+--------------------+---+---------+                                        
+| id|                   v| id|        v|
++---+--------------------+---+---------+
+|101|         [Ruetli,AG]|101|     Bern|
+|101|         [Ruetli,AG]|101|     Thun|
+|103|[Gress,DemiTarifV...|103|   Zurich|
+|103|[Gress,DemiTarifV...|103|St-Gallen|
+|103|[Gress,DemiTarifV...|103|     Chur|
+|102|  [Brelaz,DemiTarif]|102| Lausanne|
+|102|  [Brelaz,DemiTarif]|102|   Geneve|
+|102|  [Brelaz,DemiTarif]|102|     Nyon|
++---+--------------------+---+---------+
+*/
+
+val abosWithOptionalLocationsDF = abosDF.join(locationsDF,abosDF("id") === locationsDF("id"),"left_outer")
+trackedCustomerDF.show()
+
+val abosWithOptionalLocationsDF = abosDF.join(locationsDF,abosDF("id") === locationsDF("id"),"left_outer")
+abosWithOptionalLocationsDF.show()
+/*
++---+--------------------+----+---------+                                       
+| id|                   v|  id|        v|
++---+--------------------+----+---------+
+|101|         [Ruetli,AG]| 101|     Bern|
+|101|         [Ruetli,AG]| 101|     Thun|
+|103|[Gress,DemiTarifV...| 103|   Zurich|
+|103|[Gress,DemiTarifV...| 103|St-Gallen|
+|103|[Gress,DemiTarifV...| 103|     Chur|
+|102|  [Brelaz,DemiTarif]| 102| Lausanne|
+|102|  [Brelaz,DemiTarif]| 102|   Geneve|
+|102|  [Brelaz,DemiTarif]| 102|     Nyon|
+|104| [Shatten,DemiTarif]|null|     null|
++---+--------------------+----+---------+
+*/
+
+//More Example
+case class Demographic(id: Int,
+	                   age: Int,
+	                   codingBootcamp: Boolean,
+	                   country: String,
+	                   gender: String,
+	                   isEthnicMinority: Boolean,
+	                   servedInMilitary: Boolean)
+val demographics = sc.textFile(...) // Pair RDD (id,demographic)
+val demographicsDF = sc.textFile(...).toDF
+
+case class Finances(id: Int,
+	                hasDept: Boolean,
+	                hasFinancialDependents: Boolean,
+	                hasStudentLoans: Boolean,
+	                income: Int)
+
+val finances = sc.textFile(...) // Pair RDD, (id,finances)
+val financesDF = sc.textFile(...).toDF
+
+// Lets count:
+// -Swiss students
+// -who have debt & financial dependents
+demographicsDF.join(financesDF,demographicsDF("ID") === financesDF("ID"),"inner").fileter($"HasDebt" && $"hasFinancialDependents").filter($"CountryLive"==="Switzerland").count()
 
 // 5.Datasets
 
+case class Listing(street: String, zip: Int, price: Int)
+
+//listing = sc.textFile(...) 
+val listing =   List(
+  	Listing("Sun",156,1000),
+  	Listing("Sun",155,2000),
+  	Listing("Moon",144,2000),
+  	Listing("Pig",144,3000))
+val listingDF = listing.toDF
+
+import org.apache.spark.sql.functions._
+val averagePricesDF = listingDF.groupBy($"zip").avg("price")
+averagePricesDF.show()
+/*
++---+----------+                                                                
+|zip|avg(price)|
++---+----------+
+|155|    2000.0|
+|156|    1000.0|
+|144|    2500.0|
++---+----------+
+*/
+val averagePrices = averagePricesDF.collect()
+val averagePricesAgain = averagePrices.map{
+	row => (row(0).asInstanceOf[String], row(1).asInstanceOf[Int])
+}
+
+averagePrices.head.schema.printTreeString()
+/*
+root
+ |-- zip: integer (nullable = false)
+ |-- avg(price): double (nullable = true)
+*/
+
+val averagePricesAgain = averagePrices.map{
+	row => (row(0).asInstanceOf[Int], row(1).asInstanceOf[Double])
+}
+
+// DataFrames are Datasets!
+// DataFrames are actually Datasets
+// type DataFrame = Dataset[Row]
+
+// Datasets are something in the middle between DataFrames and RDDs
+// -You can use relational DataFrame operations
+// -Datasets add more typed operations that can be used as well
+// -Datasets let you use higher-order functions like map, flatMap,filter again!
+
+// Common (Typed) Transmations on Datasets
+// map
+// flatMap
+// filter
+// distinct
+// groupByKey
+// coalesce
+// repartition
+
+// Gouped Operations on Datasets
+// -calling gorupByKey on a Dataset returns a KeyValueGroupDataset
+// -KeyValueGroupDataset contains a number of aggregation operations which return Datasets
+// How to group & aggregate on Datasets?
+// a.Call groupByKey on a Dataset, get back a KeyValueGroupedDataset
+// b.Use an aggregation operation on KeyValueGroupDataset (return Datasets)
+
+// Some KeyValueGroupedDataset Aggregation Operations
+// reduceGroups; reduceGroups(f: (V,V) => V): Dataset[(K,V)]
+// agg; agge[U](col: TypedColumn[V,U]:Dataset[(K,U)]
+
+someDS.agg(avg($"column").as[Double])
 
 
+// Some KeyValueGroupedDataset (Aggregation) Operations
+// mapGroups
+// flatMapGroups
+
+// Challenge:
+// Emulate the semantics of reduceByKey on a Dataset usin Dataset operations presented so far.
+val keyValues = List((3,"Me"),(1,"Thi"),(2,"Se"),(3,"ssa"),(1,"sIsA"),(3,"ge:"),(3,"-)"),(2,"cre"),(2,"t"))
+val keyValuesRdd = sc.parallelize(keyValues)
+keyValuesRdd.reduceByKey(_+_)
+
+
+val keyValuesDS = keyValues.toDS
+keyValuesDS.groupByKey(p=>p._1).mapGroups((k,vs) => (k,vs.foldLeft("")((acc,p) => acc + p._2)))
+
+keyValuesDS.groupByKey(p=>p._1).mapGroups((k,vs) => (k,vs.foldLeft("")((acc,p) => acc + p._2))).show()
+/*
++---+-----------+                                                               
+| _1|         _2|
++---+-----------+
+|  1|        Thi|
+|  3|MesIsAge:-)|
+|  2|     Secret|
++---+-----------+
+*/
+
+
+//reduceByKey?
+keyValuesDS.groupByKey(p=>p._1).mapValues(p=>p._2).reduceGroups((acc,str)=> acc + str).show()
+
+
+// Aggregators
+// class Aggregator[-IN,BUF,OUT]
+import org.apache.spark.sql.expressions.Aggregator
+
+// This is how implement out own Aggregator
+/*
+val myAgg = new Aggregator[IN,BUF,OUT]{
+	def zero: BUF = ...                   // The initial value
+	def reduce(b:BUF,a:IN):BUF = ...      // Add an element to the running total 
+	def merge(b1: BUF, b2: BUF): BUF = ...// Merge intermediate values
+	def finish(r:BUF): OUT = ...          // Return the final result
+ }.toColumn
+
+
+*/
+
+import org.apache.spark.sql.Encoders
+val strConcat = new Aggregator[(Int,String),String,String]{
+	def zero: String = ""
+	override def bufferEncoder: org.apache.spark.sql.Encoder[String] = Encoders.STRING
+	override def outputEncoder: org.apache.spark.sql.Encoder[String] = Encoders.STRING
+	def reduce(b:String,a:(Int,String)):String = b + a._2
+	def merge(b1: String, b2: String): String = b1 + b2
+	def finish(r:String): String = r
+}.toColumn
+
+keyValuesDS.groupByKey(p=>p._1).agg(strConcat.as[String]).show()
+/*
++-----+---------------------+                                                   
+|value|$anon$1(scala.Tuple2)|
++-----+---------------------+
+|    1|              ThisIsA|
+|    3|           Message:-)|
+|    2|               Secret|
++-----+---------------------+
+*/
+
+/* Common Dataset Actions */
+// collect(): Array[T]
+// count(): Long
+// first(): T/head(): T
+// foreach(f:T=>Unit): Unit
+// reduce(f: (T,T) => T):T
+// show(): Unit
+// take(n:Int):Array[T]
+
+/* When to use Datasets vs DataFrames vs RDDs? */
+// 1.Use Datasets when...
+// - you have structured/semi-structured data
+// - you want typesafety
+// - you need to work with functional APIs
+// - you need good performance, but id does not have to be the best
+// 2.Use DataFrames when...
+// - you have structured/semi-structured data
+// - you want the best possible performance automatically optimized for you
+// 3. Use RDDs when...
+// - you have unstructured data
+// - you need to fine-tune and manage low-level details of RDD computations
+// - you have complex data types taht cannot be seriealized with Encoders
+
+// Limitations of Datasets
+// Catalyst can't optimize all operations
 
 
