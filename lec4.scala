@@ -168,10 +168,134 @@ val adultsDF = spark.sql("""SELECT * FROM people WHERE age > 17""")
 
 // 3.DataFrames(1)
 
+// Acessing Spark SQL Types
+// Important: In order to access any of these data types, wither basic or complex, you must first import Spark SQL types
+import org.apache.spark.sql.types._
+
+// Getting a look at your data
+// show() pretty-prints DataFrame in tabular form.
+// Example
+case class Employee(id:Int, fname:String,lname:String,age:Int,city:String)
+val employees = 
+  List(
+  	Employee(1,"Tom","White",25,"Tokyo"),
+  	Employee(2,"Sam","Black",35,"London"),
+  	Employee(3,"Barak","Obama",55,"Washington"),
+  	Employee(4,"Donald","Trumph",60,"Washington"))
+
+val employeeDF = sc.parallelize(employees).toDF
+employeeDF.show()
+/* 
++---+------+------+---+----------+
+| id| fname| lname|age|      city|
++---+------+------+---+----------+
+|  1|   Tom| White| 25|     Tokyo|
+|  2|   Sam| Black| 35|    London|
+|  3| Barak| Obama| 55|Washington|
+|  4|Donald|Trumph| 60|Washington|
++---+------+------+---+----------+
+*/
+
+// printSchema() : prints the schema of your DataFrame in a tree format
+employeeDF.printSchema()
+/*
+root
+ |-- id: integer (nullable = true)
+ |-- fname: string (nullable = true)
+ |-- lname: string (nullable = true)
+ |-- age: integer (nullable = true)
+ |-- city: string (nullable = true)
+*/
+
+//Specifying Columns
+// 1.using $-notation
+val over30 = employeeDF.filter($"age" > 30 )
+over30.show()
+/*
++---+------+------+---+----------+
+| id| fname| lname|age|      city|
++---+------+------+---+----------+
+|  2|   Sam| Black| 35|    London|
+|  3| Barak| Obama| 55|Washington|
+|  4|Donald|Trumph| 60|Washington|
+*/
+
+// 2.Reffering to the DataFrame
+val over30_2 = employeeDF.filter(employeeDF("age") > 30)
+over30_2.show()
+/*
++---+------+------+---+----------+
+| id| fname| lname|age|      city|
++---+------+------+---+----------+
+|  2|   Sam| Black| 35|    London|
+|  3| Barak| Obama| 55|Washington|
+|  4|Donald|Trumph| 60|Washington|
++---+------+------+---+----------+
+*/
+
+// Using SQL quering string
+val over30_3 = employeeDF.filter("age > 30") 
+ over30_3.show()
+ /*
++---+------+------+---+----------+
+| id| fname| lname|age|      city|
++---+------+------+---+----------+
+|  2|   Sam| Black| 35|    London|
+|  3| Barak| Obama| 55|Washington|
+|  4|Donald|Trumph| 60|Washington|
++---+------+------+---+----------+
+*/
+
+val washingtonEmployeeDF = employeeDF.select("id","lname").where("city == 'Washington'").orderBy("id")
+washingtonEmployeeDF.show()
+/*
++---+------+
+| id| lname|
++---+------+
+|  3| Obama|
+|  4|Trumph|
++---+------+
+*/
+
+// calculate total age in each city // this might not be useful...
+val cityTotalAgeDF = employeeDF.groupBy($"city").agg(sum($"age"))
+cityTotalAgeDF.show()
+/*
++----------+--------+                                                           
+|      city|sum(age)|
++----------+--------+
+|    London|      35|
+|     Tokyo|      25|
+|Washington|     115|
++----------+--------+
+*/
 
 
+// More example
+case class Post(authorID: Int, subforum: String, likes: Int, date:String)
+val post = List(
+  	Post(1,"a",25,"2014-08-01 23:01:05"),
+  	Post(2,"b",35,"2014-11-01 21:00:37"),
+  	Post(3,"b",105,"2015-01-01 22:10:05"),
+  	Post(4,"c",10,"2016-08-06 01:02:05"),
+    Post(1,"c",100,"2014-08-06 03:02:05"))
 
+val postDF = sc.parallelize(post).toDF
 
+val rankedDF = postDF.groupBy($"authorID",$"subforum").agg(count($"authorID")).orderBy($"subforum",$"count(authorID)".desc)
+
+rankedDF.show()
+/*
++--------+--------+---------------+                                             
+|authorID|subforum|count(authorID)|
++--------+--------+---------------+
+|       1|       a|              1|
+|       3|       b|              1|
+|       2|       b|              1|
+|       1|       c|              1|
+|       4|       c|              1|
++--------+--------+---------------+
+*/
 
 // 4.DataFrames(2)
 
